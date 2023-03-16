@@ -31,7 +31,7 @@ public static final int kDriverControllerPort = 0; }
         public static final double kPTurning = 0.5;
     }
 
-    public static final class DriveConstants { 
+    public static final class DriveConstants {  
 
         public static final double kTrackWidth = Units.inchesToMeters(21);
         // Distance between right and left wheels
