@@ -68,6 +68,12 @@ public static final int kDriverControllerPort = 0; }
         public static final int kFrontRightDriveAbsoluteEncoderPort = 1;
         public static final int kBackRightDriveAbsoluteEncoderPort = 3;
 
+        public static final int kLFDEnc = 0;
+        public static final int kLFTEnc = 1;
+        public static final int kRFDEnc = 2;
+        public static final int kRFTEnc = 3;
+        
+
         public static final boolean kFrontLeftDriveAbsoluteEncoderReversed = false;
         public static final boolean kBackLeftDriveAbsoluteEncoderReversed = false;
         public static final boolean kFrontRightDriveAbsoluteEncoderReversed = false;

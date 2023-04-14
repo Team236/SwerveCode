@@ -1,14 +1,17 @@
 package frc.robot.subsystems;
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.TalonFXControlMode;
+import com.ctre.phoenix.motorcontrol.TalonFXSensorCollection;
 import com.ctre.phoenix.motorcontrol.can.TalonFX;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonFX;
+import com.ctre.phoenix.sensors.CANCoder;
 import com.ctre.phoenix.motorcontrol.can.TalonFXConfiguration;
 import com.revrobotics.AbsoluteEncoder;
 import com.revrobotics.CANSparkMax;
 import edu.wpi.first.wpilibj.Encoder;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
 import edu.wpi.first.wpilibj.AnalogInput;
+import edu.wpi.first.wpilibj.CounterBase;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -23,25 +26,27 @@ public class SwerveModule {
     //private final CANSparkMax turningMotor;
     private final TalonFX driveMotor;
     private final TalonFX turningMotor;
-
     private final PIDController turningPidController;
-    private final Encoder driveEncoder;
-    private final Encoder turningEncoder;
-
-    private final AnalogInput absoluteEncoder;
+    private final TalonFXSensorCollection driveEncoder, turningEncoder;
+   // private final AbsoluteEncoder turningEncoder;
+    //private final int driveEncID, turningEncID;
+   // private final AbsoluteEncoder absoluteEncoder;
+    private final int absoluteEncoderId, driveMotorId, turningMotorId;
     private final boolean absoluteEncoderReversed;
     private final double absoluteEncoderOffsetRad;
 
     public SwerveModule(int driveMotorId, int turningMotorId, boolean driveMotorReversed, boolean turningMotorReversed,
-            int absoluteEncoderId, double absoluteEncoderOffset, boolean absoluteEncoderReversed, int driveEncoderID, int driveEncoderID2, int turningEncoderID,
-            int turningEncoderID2) {
+            int absoluteEncoderId, double absoluteEncoderOffset, boolean absoluteEncoderReversed) {
 
         this.absoluteEncoderOffsetRad = absoluteEncoderOffset;
         this.absoluteEncoderReversed = absoluteEncoderReversed;
-        absoluteEncoder = new AnalogInput(absoluteEncoderId);
+        this.absoluteEncoderId = absoluteEncoderId;
+        this.driveMotorId = driveMotorId;
+        this.turningMotorId = turningMotorId;
+        //this.absoluteEncoder = absoluteEncoder;
 
         driveMotor = new TalonFX(driveMotorId); // creates a new TalonFX with ID 0
-        turningMotor = new TalonFX(turningMotorId)
+        turningMotor = new TalonFX(turningMotorId);
 
         TalonFXConfiguration driveConfig = new TalonFXConfiguration();
         driveConfig.supplyCurrLimit.enable = true;
@@ -61,15 +66,14 @@ public class SwerveModule {
         driveMotor.setInverted(driveMotorReversed);
         turningMotor.setInverted(turningMotorReversed);
 
-        driveEncoder = new AbsoluteEncoder() {
-          
-        };
-        turningEncoder = new Encoder(turningEncoderID, turningEncoderID2);
+        driveEncoder = driveMotor.getSensorCollection();
+        turningEncoder = turningMotor.getSensorCollection();
+        //absoluteEncoder = new AbsoluteEncoder(absoluteEncoderId);
 
-        driveEncoder.setPositionConversionFactor(ModuleConstants.kDriveEncoderRot2Meter);
-        driveEncoder.setVelocityConversionFactor(ModuleConstants.kDriveEncoderRPM2MeterPerSec);
-        turningEncoder.setPositionConversionFactor(ModuleConstants.kTurningEncoderRot2Rad);
-        turningEncoder.setVelocityConversionFactor(ModuleConstants.kTurningEncoderRPM2RadPerSec);
+        ((AbsoluteEncoder) driveEncoder).setPositionConversionFactor(ModuleConstants.kDriveEncoderRot2Meter);
+        ((AbsoluteEncoder) driveEncoder).setVelocityConversionFactor(ModuleConstants.kDriveEncoderRPM2MeterPerSec);
+        ((AbsoluteEncoder) turningEncoder).setPositionConversionFactor(ModuleConstants.kTurningEncoderRot2Rad);
+        ((AbsoluteEncoder) turningEncoder).setVelocityConversionFactor(ModuleConstants.kTurningEncoderRPM2RadPerSec);
 
         turningPidController = new PIDController(ModuleConstants.kPTurning, 0, 0);
         turningPidController.enableContinuousInput(-Math.PI, Math.PI);
@@ -77,32 +81,27 @@ public class SwerveModule {
         resetEncoders();
     }
 
-    public double getDrivePosition() {
-        return driveEncoder.getRaw();
-    }
-
     public double getTurningPosition() {
-        return turningEncoder.getRaw();
+        return turningEncoder.getIntegratedSensorPosition();
     }
 
     public double getDriveVelocity() {
-        return driveEncoder.getRate();
+        return driveEncoder.getIntegratedSensorVelocity();
     }
 
     public double getTurningVelocity() {
-        return turningEncoder.getRate();
-    }
+        return turningEncoder.getIntegratedSensorVelocity();}
 
-    public double getAbsoluteEncoderRad() {
-        double angle = absoluteEncoder.getVoltage() / RobotController.getVoltage5V();
+     /*public double getAbsoluteEncoderRad() {
+        double angle = ((AnalogInput) absoluteEncoder).getVoltage() / RobotController.getVoltage5V();
         angle *= 2.0 * Math.PI;
         angle -= absoluteEncoderOffsetRad;
         return angle * (absoluteEncoderReversed ? -1.0 : 1.0);
-    }
+    }*/
 
     public void resetEncoders() {
-        driveEncoder.reset();
-        turningEncoder.set(getAbsoluteEncoderRad());
+     driveEncoder.setIntegratedSensorPosition(0, 10);
+     //turningEncoder.setIntegratedSensorPosition(getAbsoluteEncoderRad(), 10);
     }
 
     public SwerveModuleState getState() {
@@ -117,7 +116,7 @@ public class SwerveModule {
         state = SwerveModuleState.optimize(state, getState().angle);
         driveMotor.set(TalonFXControlMode.PercentOutput, state.speedMetersPerSecond / DriveConstants.kPhysicalMaxSpeedMetersPerSecond);
         turningMotor.set(TalonFXControlMode.PercentOutput, turningPidController.calculate(getTurningPosition(), state.angle.getRadians()));
-        SmartDashboard.putString("Swerve[" + absoluteEncoder.getChannel() + "] state", state.toString());
+        //SmartDashboard.putString("Swerve[" + ((AnalogInput) absoluteEncoder).getChannel() + "] state", state.toString());
     }
 
     public void stop() {
